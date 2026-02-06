@@ -20,6 +20,130 @@ limitations under the License.
 #include <cstdint>
 
 #include "tensorflow/lite/kernels/internal/common.h"
+#include <stdio.h>
+
+#define MP_INT(name, val) \
+  MicroPrintf("%s = %d\n", name, (int)(val))
+
+#define MP_PTR(name, ptr) \
+  MicroPrintf("%s = %p\n", name, (const void*)(ptr))
+
+// Print first N int8 values
+inline void MicroPrintInt8Array(const char* name,
+                                const int8_t* data,
+                                int count, int max_n = 16) {
+  MicroPrintf("%s:", name);
+  int n = count < max_n ? count : max_n;
+  for (int i = 0; i < n; i++) {
+    MicroPrintf(" %d", data[i]);
+  }
+  if (count > max_n) MicroPrintf(" ...");
+  MicroPrintf("\n");
+}
+
+// Print first N int32 values
+inline void MicroPrintInt32Array(const char* name,
+                                 const int32_t* data,
+                                 int count, int max_n = 16) {
+  MicroPrintf("%s:", name);
+  int n = count < max_n ? count : max_n;
+  for (int i = 0; i < n; i++) {
+    MicroPrintf(" %ld", (long)data[i]);
+  }
+  if (count > max_n) MicroPrintf(" ...");
+  MicroPrintf("\n");
+}
+
+inline void MicroDumpInt8AsCArray(const char* name,
+                                  const int8_t* data,
+                                  int length) {
+  MicroPrintf("\n// ===== BEGIN %s =====\n", name);
+  MicroPrintf("const int8_t %s[%d] = {\n", name, length);
+
+  for (int i = 0; i < length; i++) {
+    // indent every line
+    if ((i % 16) == 0) {
+      MicroPrintf("  ");
+    }
+
+    MicroPrintf("%d", data[i]);
+
+    if (i != length - 1) {
+      MicroPrintf(", ");
+    }
+
+    if ((i % 16) == 15) {
+      MicroPrintf("\n");
+    }
+  }
+
+  if ((length % 16) != 0) {
+    MicroPrintf("\n");
+  }
+
+  MicroPrintf("};\n");
+  MicroPrintf("// ===== END %s =====\n\n", name);
+}
+
+inline void DumpInt8TensorAsCArray_OneLine(
+    const char* name,
+    const int8_t* data,
+    int size) {
+
+  MicroPrintf("\n// ===== BEGIN %s =====\n", name);
+  MicroPrintf("static const int8_t %s[%d] = {\n", name, size);
+
+  char line[160];
+  int pos = 0;
+
+  for (int i = 0; i < size; i++) {
+    pos += snprintf(&line[pos], sizeof(line) - pos,
+                    "%d", data[i]);
+
+    if (i != size - 1) {
+      pos += snprintf(&line[pos], sizeof(line) - pos, ", ");
+    }
+
+    if ((i & 0x0F) == 0x0F || i == size - 1) {
+      MicroPrintf("  %s\n", line);
+      pos = 0;
+      line[0] = '\0';
+    }
+  }
+
+  MicroPrintf("};\n");
+  MicroPrintf("// ===== END %s =====\n\n", name);
+}
+
+inline void DumpInt32ArrayAsCArray_OneLine(
+    const char* name,
+    const int32_t* data,
+    int size) {
+
+  MicroPrintf("\n// ===== BEGIN %s =====\n", name);
+  MicroPrintf("static const int32_t %s[%d] = {\n", name, size);
+
+  char line[160];
+  int pos = 0;
+
+  for (int i = 0; i < size; i++) {
+    pos += snprintf(&line[pos], sizeof(line) - pos, "%d", data[i]);
+
+    if (i != size - 1) {
+      pos += snprintf(&line[pos], sizeof(line) - pos, ", ");
+    }
+
+    if ((i & 0x0F) == 0x0F || i == size - 1) {
+      MicroPrintf("  %s\n", line);
+      pos = 0;
+      line[0] = '\0';
+    }
+  }
+
+  MicroPrintf("};\n");
+  MicroPrintf("// ===== END %s =====\n\n", name);
+}
+
 
 namespace tflite {
 namespace reference_integer_ops {
@@ -140,6 +264,61 @@ void FullyConnected(const FullyConnectedParams& params,
                     const WeightType* filter_data,
                     const RuntimeShape& bias_shape, const BiasType* bias_data,
                     const RuntimeShape& output_shape, OutputType* output_data) {
+
+  // MicroPrintf("\n=== FullyConnected Debug ===\n");
+
+  // // Quantization & activation parameters
+  // MicroPrintf("input_offset = %d\n", params.input_offset);
+  // MicroPrintf("filter_offset = %d\n", params.weights_offset);
+  // MicroPrintf("output_offset = %d\n", params.output_offset);
+  // MicroPrintf("output_multiplier = %d\n", params.output_multiplier);
+  // MicroPrintf("output_shift = %d\n", params.output_shift);
+  // MicroPrintf("act_min = %d\n", params.quantized_activation_min);
+  // MicroPrintf("act_max = %d\n", params.quantized_activation_max);
+
+  // // Shapes
+  // MicroPrintf("input_shape dims = %d\n", input_shape.DimensionsCount());
+  // MicroPrintf("filter_shape dims = %d\n", filter_shape.DimensionsCount());
+  // MicroPrintf("bias_shape dims = %d\n", bias_shape.DimensionsCount());
+  // MicroPrintf("output_shape dims = %d\n", output_shape.DimensionsCount());
+
+  // MicroPrintf("input_shape values: ");
+  // for (int i = 0; i < input_shape.DimensionsCount(); i++)
+  //   MicroPrintf("%d ", input_shape.Dims(i));
+  // MicroPrintf("\n");
+
+  // MicroPrintf("filter_shape values: ");
+  // for (int i = 0; i < filter_shape.DimensionsCount(); i++)
+  //   MicroPrintf("%d ", filter_shape.Dims(i));
+  // MicroPrintf("\n");
+
+  // MicroPrintf("output_shape values: ");
+  // for (int i = 0; i < output_shape.DimensionsCount(); i++)
+  //   MicroPrintf("%d ", output_shape.Dims(i));
+  // MicroPrintf("\n");
+
+  // MicroPrintf("bias_shape flat size = %d\n", bias_shape.FlatSize());
+
+  // // Dump input tensor
+  // DumpInt8TensorAsCArray_OneLine("fc_input_data",
+  //                                reinterpret_cast<const int8_t*>(input_data),
+  //                                input_shape.FlatSize());
+
+  // // Dump filter tensor
+  // DumpInt8TensorAsCArray_OneLine("fc_filter_data",
+  //                                reinterpret_cast<const int8_t*>(filter_data),
+  //                                filter_shape.FlatSize());
+
+  // // Dump bias tensor
+  // if (bias_data)
+  //   DumpInt32ArrayAsCArray_OneLine("fc_bias_data",
+  //                                  reinterpret_cast<const int32_t*>(bias_data),
+  //                                  bias_shape.FlatSize());
+
+  // // Optional: dump output_multiplier & output_shift
+  // MicroPrintf("output_multiplier = %d\n", params.output_multiplier);
+  // MicroPrintf("output_shift = %d\n", params.output_shift);
+
   const int32_t input_offset = params.input_offset;
   const int32_t filter_offset = params.weights_offset;
   const int32_t output_offset = params.output_offset;
@@ -177,6 +356,11 @@ void FullyConnected(const FullyConnectedParams& params,
           static_cast<OutputType>(acc_scaled);
     }
   }
+    // Dump output tensor
+  DumpInt8TensorAsCArray_OneLine("fc_output_data",
+                                 reinterpret_cast<const int8_t*>(output_data),
+                                 output_shape.FlatSize());
+
 }
 
 // This implementation receives the scales in float and performs requant in

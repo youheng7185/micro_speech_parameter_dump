@@ -16,8 +16,104 @@ limitations under the License.
 #define TENSORFLOW_LITE_KERNELS_INTERNAL_REFERENCE_INTEGER_OPS_DEPTHWISE_CONV_H_
 
 #include <algorithm>
-
 #include "tensorflow/lite/kernels/internal/common.h"
+//#include "tensorflow/lite/micro/micro_log.h"
+//#include "tensorflow/lite/micro/debug_log.h"
+#include <stdio.h>
+
+#define MP_INT(name, val) \
+  MicroPrintf("%s = %d\n", name, (int)(val))
+
+#define MP_PTR(name, ptr) \
+  MicroPrintf("%s = %p\n", name, (const void*)(ptr))
+
+// Print first N int8 values
+inline void MicroPrintInt8Array(const char* name,
+                                const int8_t* data,
+                                int count, int max_n = 16) {
+  MicroPrintf("%s:", name);
+  int n = count < max_n ? count : max_n;
+  for (int i = 0; i < n; i++) {
+    MicroPrintf(" %d", data[i]);
+  }
+  if (count > max_n) MicroPrintf(" ...");
+  MicroPrintf("\n");
+}
+
+// Print first N int32 values
+inline void MicroPrintInt32Array(const char* name,
+                                 const int32_t* data,
+                                 int count, int max_n = 16) {
+  MicroPrintf("%s:", name);
+  int n = count < max_n ? count : max_n;
+  for (int i = 0; i < n; i++) {
+    MicroPrintf(" %ld", (long)data[i]);
+  }
+  if (count > max_n) MicroPrintf(" ...");
+  MicroPrintf("\n");
+}
+
+inline void MicroDumpInt8AsCArray(const char* name,
+                                  const int8_t* data,
+                                  int length) {
+  MicroPrintf("\n// ===== BEGIN %s =====\n", name);
+  MicroPrintf("const int8_t %s[%d] = {\n", name, length);
+
+  for (int i = 0; i < length; i++) {
+    // indent every line
+    if ((i % 16) == 0) {
+      MicroPrintf("  ");
+    }
+
+    MicroPrintf("%d", data[i]);
+
+    if (i != length - 1) {
+      MicroPrintf(", ");
+    }
+
+    if ((i % 16) == 15) {
+      MicroPrintf("\n");
+    }
+  }
+
+  if ((length % 16) != 0) {
+    MicroPrintf("\n");
+  }
+
+  MicroPrintf("};\n");
+  MicroPrintf("// ===== END %s =====\n\n", name);
+}
+
+inline void DumpInt8TensorAsCArray_OneLine(
+    const char* name,
+    const int8_t* data,
+    int size) {
+
+  MicroPrintf("\n// ===== BEGIN %s =====\n", name);
+  MicroPrintf("static const int8_t %s[%d] = {\n", name, size);
+
+  char line[160];
+  int pos = 0;
+
+  for (int i = 0; i < size; i++) {
+    pos += snprintf(&line[pos], sizeof(line) - pos,
+                    "%d", data[i]);
+
+    if (i != size - 1) {
+      pos += snprintf(&line[pos], sizeof(line) - pos, ", ");
+    }
+
+    if ((i & 0x0F) == 0x0F || i == size - 1) {
+      MicroPrintf("  %s\n", line);
+      pos = 0;
+      line[0] = '\0';
+    }
+  }
+
+  MicroPrintf("};\n");
+  MicroPrintf("// ===== END %s =====\n\n", name);
+}
+
 
 namespace tflite {
 namespace reference_integer_ops {
@@ -28,6 +124,93 @@ inline void DepthwiseConvPerChannel(
     const int8_t* filter_data, const RuntimeShape& bias_shape,
     const int32_t* bias_data, const RuntimeShape& output_shape,
     int8_t* output_data) {
+    //   MicroPrintf("hello from depthwiseconv per channel\n");
+
+    //   MicroPrintf("\n=== DepthwiseConvPerChannel ===\n");
+
+    // MP_INT("stride_w", params.stride_width);
+    // MP_INT("stride_h", params.stride_height);
+    // MP_INT("dilation_w", params.dilation_width_factor);
+    // MP_INT("dilation_h", params.dilation_height_factor);
+    // MP_INT("pad_w", params.padding_values.width);
+    // MP_INT("pad_h", params.padding_values.height);
+    // MP_INT("depth_multiplier", params.depth_multiplier);
+
+    // MP_INT("input_offset", params.input_offset);
+    // MP_INT("output_offset", params.output_offset);
+    // MP_INT("act_min", params.quantized_activation_min);
+    // MP_INT("act_max", params.quantized_activation_max);
+
+    // MP_INT("input_shape", input_shape.DimensionsCount());
+    // MicroPrintf("input dims: [%d %d %d %d]\n",
+    //   input_shape.Dims(0),
+    //   input_shape.Dims(1),
+    //   input_shape.Dims(2),
+    //   input_shape.Dims(3));
+
+    // MicroPrintf("filter dims: [%d %d %d %d]\n",
+    //   filter_shape.Dims(0),
+    //   filter_shape.Dims(1),
+    //   filter_shape.Dims(2),
+    //   filter_shape.Dims(3));
+
+    // MicroPrintf("output dims: [%d %d %d %d]\n",
+    //   output_shape.Dims(0),
+    //   output_shape.Dims(1),
+    //   output_shape.Dims(2),
+    //   output_shape.Dims(3));
+
+    // MP_INT("bias size", bias_shape.FlatSize());
+
+    // MP_PTR("output_multiplier", output_multiplier);
+    // MP_PTR("output_shift", output_shift);
+    // MP_PTR("bias_data", bias_data);
+
+    // int output_depth_dump = filter_shape.Dims(3);
+
+    // MicroPrintInt32Array("output_multiplier",
+    //                     output_multiplier,
+    //                     output_depth_dump);
+
+    // MicroPrintInt32Array("output_shift",
+    //                     output_shift,
+    //                     output_depth_dump);
+
+    // if (bias_data) {
+    // MicroPrintInt32Array("bias_data",
+    //                       bias_data,
+    //                       output_depth_dump);
+    // }
+
+    // int filter_size = filter_shape.Dims(1) *
+    //                   filter_shape.Dims(2) *
+    //                   filter_shape.Dims(3);
+
+    // MicroPrintInt8Array("filter_data",
+    //                     filter_data,
+    //                     filter_size);
+
+    // MicroPrintInt8Array("input_data",
+    //                     input_data,
+    //                     input_shape.FlatSize());
+
+    //   DumpInt8TensorAsCArray_OneLine(
+    //       "debug_input_data",
+    //       input_data,
+    //       input_shape.FlatSize());
+
+    // MicroPrintf("// filter shape: [1, %d, %d, %d]\n",
+    //   filter_shape.Dims(1),
+    //   filter_shape.Dims(2),
+    //   filter_shape.Dims(3));
+
+  // DumpInt8TensorAsCArray_OneLine(
+  //     "debug_filter_data",
+  //     filter_data,
+  //     filter_shape.Dims(1) *
+  //     filter_shape.Dims(2) *
+  //     filter_shape.Dims(3));
+
   // Get parameters.
   // TODO(b/141565753): Re-introduce ScopedProfilingLabel on Micro.
   const int stride_width = params.stride_width;
@@ -119,6 +302,24 @@ inline void DepthwiseConvPerChannel(
       }
     }
   }
+
+
+  // int output_size =
+  //     output_shape.Dims(0) *
+  //     output_shape.Dims(1) *
+  //     output_shape.Dims(2) *
+  //     output_shape.Dims(3);
+
+  // MicroPrintf("// output shape: [%d %d %d %d]\n",
+  //     output_shape.Dims(0),
+  //     output_shape.Dims(1),
+  //     output_shape.Dims(2),
+  //     output_shape.Dims(3));
+
+  // DumpInt8TensorAsCArray_OneLine(
+  //     "tflite_output_data",
+  //     output_data,
+  //     output_size);
 }
 
 inline void DepthwiseConvPerChannel(
@@ -156,6 +357,8 @@ inline void DepthwiseConvPerChannel(
   const int output_width = output_shape.Dims(2);
   TFLITE_DCHECK_EQ(output_depth, input_depth * depth_multiplier);
   TFLITE_DCHECK_EQ(bias_shape.FlatSize(), output_depth);
+
+  MicroPrintf("hello from conv file1\n");
 
   for (int batch = 0; batch < batches; ++batch) {
     for (int out_y = 0; out_y < output_height; ++out_y) {
@@ -214,6 +417,7 @@ inline void DepthwiseConvHybridPerChannel(
     const RuntimeShape& bias_shape, const float* bias_data,
     const RuntimeShape& output_shape, float* output_data,
     const float* per_channel_scale, int32_t* input_offset) {
+      MicroPrintf("hello from conv file3\n");
   const int stride_width = params.stride_width;
   const int stride_height = params.stride_height;
   const int dilation_width_factor = params.dilation_width_factor;
